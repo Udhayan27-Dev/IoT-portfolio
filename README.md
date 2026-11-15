@@ -9,25 +9,27 @@ An end-to-end documentation portfolio showcasing bare-metal **Embedded Rust** (`
 
 ## Projects Featured
 
+All projects are consolidated in the main repository: [**https://github.com/Udhayan27-Dev/IoT_Task1**](https://github.com/Udhayan27-Dev/IoT_Task1)
+
 1. **[Task 1: ESP32-C3 Web Server & HTML LED Control](task-1.html)**
    - *Tech:* Embedded Rust (`no_std`), `esp-hal`, `esp-radio`, `embassy-net`, Port 80 HTTP server
-   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1](https://github.com/Udhayan27-Dev/IoT_Task1)
+   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task1-web-control](https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task1-web-control)
 
 2. **[Task 2: Adafruit IO Dashboard & Async MQTT Relay Control](task-2.html)**
    - *Tech:* Custom async MQTT 3.1.1 packet parser, `critical-section` Mutex, Active-LOW 230V AC Relay
-   - *Code:* [https://github.com/Udhayan27-Dev/IoT-Task2](https://github.com/Udhayan27-Dev/IoT-Task2)
+   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task2-adafruit-mqtt](https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task2-adafruit-mqtt)
 
 3. **[Task 3: Voice Assistant & Cloud Automation](task-3.html)**
    - *Tech:* Google Assistant + IFTTT Webhooks + Adafruit IO MQTT with sub-second voice actuation
-   - *Code:* [https://github.com/Udhayan27-Dev/IoT-Task3](https://github.com/Udhayan27-Dev/IoT-Task3)
+   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task3-voice-automation](https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task3-voice-automation)
 
 4. **[Task 4: Firebase IoT Monitoring Dashboard](task-4.html)**
    - *Tech:* Real-time DHT11 & LDR sensor streaming, Firebase Realtime Database, Firebase Authentication
-   - *Code:* [https://github.com/Udhayan27-Dev/IoT-Task4](https://github.com/Udhayan27-Dev/IoT-Task4)
+   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task4-firebase-dashboard](https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task4-firebase-dashboard)
 
 5. **[Task 5: Firebase Logging, Automation & Data Export](task-5.html)**
    - *Tech:* Autonomous ambient LDR threshold switching, timestamped RTDB audit logs, history charts, CSV export
-   - *Code:* [https://github.com/Udhayan27-Dev/IoT-Task4](https://github.com/Udhayan27-Dev/IoT-Task4)
+   - *Code:* [https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task5-logging-automation](https://github.com/Udhayan27-Dev/IoT_Task1/tree/main/task5-logging-automation)
 
 ---
 
