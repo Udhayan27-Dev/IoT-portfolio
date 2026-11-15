@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task 1: ESP32-C3 Web Server &amp; HTML LED Control · IoT Portfolio</title>
+<meta name="description" content="Bare-metal asynchronous Rust HTTP web server on ESP32-C3 for local LED switching.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html">IoT Portfolio <span>· Udhayan · ESP32-C3 Bare-Metal Rust</span></a>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="task-1.html" class="on">Task 1</a>
+    <a href="task-2.html">Task 2</a>
+    <a href="task-3.html">Task 3</a>
+    <a href="task-4.html">Task 4</a>
+    <a href="task-5.html">Task 5</a>
+    <a href="https://github.com/Udhayan27-Dev/IoT_Task1" target="_blank" rel="noopener">Repository</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <h1>Task 1: ESP32-C3 Web Server &amp; HTML LED Control</h1>
+  <p class="lede">Bare-metal async Rust HTTP server hosting an interactive web UI on port 80 to toggle an LED.</p>
+  <div class="links">
+    <a class="btn" href="https://github.com/Udhayan27-Dev/IoT_Task1" target="_blank" rel="noopener">GitHub Repository</a>
+    <a class="btn" href="#s8">View Evidence &amp; Video</a>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="toc">
+  <b>Contents</b>
+  <a href="#s1">1. Overview</a>
+  <a href="#s2">2. Concepts</a>
+  <a href="#s3">3. Architecture</a>
+  <a href="#s4">4. Hardware &amp; Software</a>
+  <a href="#s5">5. Wiring / Setup</a>
+  <a href="#s6">6. Implementation</a>
+  <a href="#s7">7. Configuration</a>
+  <a href="#s8">8. Evidence</a>
+  <a href="#s9">9. Challenges &amp; Fixes</a>
+  <a href="#s10">10. Reflection</a>
+  <a href="#s11">11. Repository Link</a>
+  <a href="#checklist">✓ Checklist</a>
+</aside>
+
+<div class="content">
+
+<section id="s1">
+  <h2><span class="num">1</span>Overview</h2>
+  <p>The objective of Task 1 is to transform an <b>ESP32-C3</b> RISC-V microcontroller into a standalone HTTP web server operating on the local Wi-Fi network. By connecting any device with a standard web browser (such as a smartphone or laptop), the user can view the current LED state and toggle the physical LED on and off by clicking web buttons.</p>
+  <p>Rather than using standard C++ libraries, this implementation is built entirely in <b>bare-metal Rust (<code>no_std</code>)</b> utilizing the <b>Embassy</b> asynchronous framework, <b><code>esp-hal</code></b>, and <b><code>esp-radio</code></b>, providing strict memory safety and minimal memory overhead.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2</span>Concepts</h2>
+  <p><b>Embedded HTTP Web Server:</b> HTTP is an application-level request-response protocol running over TCP. The ESP32-C3 binds an asynchronous TCP listener on port 80. When a browser connects, the firmware parses the incoming HTTP request line (e.g., <code>GET /on HTTP/1.1</code>), executes the corresponding hardware routine, and responds with a valid HTTP/1.1 response containing an HTML payload.</p>
+  <p><b>Station Mode &amp; DHCP:</b> The ESP32-C3 Wi-Fi radio operates in Station (STA) mode, connecting to a local 2.4 GHz wireless Access Point. Using <code>embassy-net</code>'s built-in DHCP client, the MCU negotiates an IPv4 address on the local subnet.</p>
+  <p><b>Non-Blocking Async Event Loop:</b> Instead of blocking threads with busy-waiting loops, Embassy uses cooperative green tasks managed by an async executor. Network polling, timer ticks, and socket reads suspend their task when idle, leaving the RISC-V core in low-power wait-for-interrupt states.</p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3</span>Architecture &amp; Data Flow</h2>
+  <svg class="diagram" viewBox="0 0 880 155" role="img" aria-label="Task 1 Data Flow" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <rect x="10" y="40" width="170" height="70" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+    <text x="95" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Web Browser</text>
+    <text x="95" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">Phone / PC</text>
+
+    <line x1="180" y1="65" x2="275" y2="65" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="227" y="58" text-anchor="middle" font-size="11" fill="#6b7280">HTTP GET /on</text>
+
+    <line x1="275" y1="85" x2="180" y2="85" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="227" y="100" text-anchor="middle" font-size="11" fill="#6b7280">200 OK (HTML)</text>
+
+    <rect x="275" y="40" width="180" height="70" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="365" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">esp-radio &amp; Wi-Fi</text>
+    <text x="365" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">STA Mode · Port 80</text>
+
+    <line x1="455" y1="75" x2="540" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="497" y="68" text-anchor="middle" font-size="11" fill="#6b7280">TCP stream</text>
+
+    <rect x="540" y="40" width="170" height="70" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="625" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">web_task (Rust)</text>
+    <text x="625" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">embassy-net</text>
+
+    <line x1="710" y1="75" x2="775" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="742" y="68" text-anchor="middle" font-size="11" fill="#6b7280">set_high()</text>
+
+    <rect x="775" y="40" width="95" height="70" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="822" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">LED</text>
+    <text x="822" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">GPIO 10</text>
+  </svg>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4</span>Hardware &amp; Software</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Hardware Component</th>
+          <th>Software &amp; Toolchain</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ESP32-C3 (RISC-V 32-bit core)</td>
+          <td>Rust Toolchain (<code>nightly/stable</code> riscv32imc-unknown-none-elf)</td>
+        </tr>
+        <tr>
+          <td>Red 5mm LED</td>
+          <td><code>esp-hal</code> v1.1.0 (Hardware Abstraction Layer)</td>
+        </tr>
+        <tr>
+          <td>220 Ω Current-limiting Resistor</td>
+          <td><code>embassy-net</code> &amp; <code>embassy-executor</code> (Async runtime)</td>
+        </tr>
+        <tr>
+          <td>Half-size Breadboard &amp; Jumper Wires</td>
+          <td><code>esp-radio</code> (Espressif 802.11 Wi-Fi stack)</td>
+        </tr>
+        <tr>
+          <td>USB-C Data Cable</td>
+          <td><code>espflash</code> cargo flash runner &amp; serial monitor</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5</span>Wiring / Setup</h2>
+  <svg class="diagram" viewBox="0 0 760 140" role="img" aria-label="Task 1 Wiring" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+    <rect x="20" y="20" width="160" height="95" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="100" y="60" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">ESP32-C3</text>
+    <text x="100" y="80" text-anchor="middle" font-size="11.5" fill="#6b7280">MCU Board</text>
+
+    <text x="190" y="48" font-size="12" fill="#1f2937" font-family="ui-monospace,monospace">GPIO 10</text>
+    <line x1="260" y1="44" x2="480" y2="44" stroke="#64748b" stroke-width="2"/>
+    <circle cx="260" cy="44" r="3.5" fill="#64748b"/>
+    <circle cx="480" cy="44" r="3.5" fill="#64748b"/>
+    <text x="495" y="48" font-size="12" fill="#1f2937"><tspan font-weight="600">LED Anode (+)</tspan></text>
+
+    <text x="190" y="92" font-size="12" fill="#1f2937" font-family="ui-monospace,monospace">GND</text>
+    <line x1="260" y1="88" x2="480" y2="88" stroke="#64748b" stroke-width="2"/>
+    <circle cx="260" cy="88" r="3.5" fill="#64748b"/>
+    <circle cx="480" cy="88" r="3.5" fill="#64748b"/>
+    <text x="495" y="92" font-size="12" fill="#1f2937"><tspan font-weight="600">220 Ω Resistor</tspan> <tspan fill="#6b7280">→ LED Cathode (-)</tspan></text>
+  </svg>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ESP32-C3 Pin</th>
+          <th>Breadboard Connection</th>
+          <th>Logic State</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GPIO 10</code></td>
+          <td>LED Anode (longer leg)</td>
+          <td>HIGH (3.3V) = ON, LOW (0V) = OFF</td>
+        </tr>
+        <tr>
+          <td><code>GND</code></td>
+          <td>220 Ω resistor to LED Cathode (shorter leg)</td>
+          <td>Ground Reference</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6</span>Implementation</h2>
+  <details class="codefile" open>
+    <summary>
+      <span class="fname">src/bin/main.rs (Embedded Rust)</span>
+      <a href="https://github.com/Udhayan27-Dev/IoT_Task1/blob/main/src/bin/main.rs" target="_blank" rel="noopener">view on GitHub</a>
+    </summary>
+    <pre><code class="language-rust">#![no_std]
+#![no_main]
+
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::ToString;
+use embassy_executor::Spawner;
+use embassy_net::tcp::TcpSocket;
+use embassy_time::{Duration, Timer};
+use embedded_io_async::Write as _;
+use esp_backtrace as _;
+use esp_hal::clock::CpuClock;
+use esp_hal::gpio::{Level, Output, OutputConfig};
+use esp_hal::timer::timg::TimerGroup;
+use log::info;
+
+esp_bootloader_esp_idf::esp_app_desc!();
+
+const SSID: &str = "YOUR_WIFI_SSID";
+const PASSWORD: &str = "YOUR_WIFI_PASSWORD";
+
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
+
+#[esp_rtos::main]
+async fn main(spawner: Spawner) -> ! {
+    esp_println::logger::init_logger_from_env();
+
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
+
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let sw_interrupt =
+        esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
+
+    info!("Embassy initialized!");
+
+    let led = Output::new(peripherals.GPIO10, Level::Low, OutputConfig::default());
+
+    let (controller, interfaces) =
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let wifi_interface = interfaces.station;
+
+    let net_config = embassy_net::Config::dhcpv4(Default::default());
+    let rng = esp_hal::rng::Rng::new();
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        net_config,
+        mk_static!(
+            embassy_net::StackResources<3>,
+            embassy_net::StackResources::<3>::new()
+        ),
+        seed,
+    );
+
+    spawner.spawn(connection(controller).expect("spawn connection"));
+    spawner.spawn(net_task(runner).expect("spawn net runner"));
+
+    info!("Waiting for IP address...");
+    loop {
+        if let Some(cfg) = stack.config_v4() {
+            info!("Got IP: {}", cfg.address);
+            break;
+        }
+        Timer::after(Duration::from_millis(500)).await;
+    }
+
+    spawner.spawn(web_task(stack, led).expect("failed to spawn web task"));
+
+    loop {
+        Timer::after(Duration::from_secs(3600)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn connection(mut controller: esp_radio::wifi::WifiController<'static>) {
+    let station_config = esp_radio::wifi::Config::Station(
+        esp_radio::wifi::sta::StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.to_string()),
+    );
+    controller.set_config(&station_config).unwrap();
+
+    loop {
+        info!("Connecting...");
+        match controller.connect_async().await {
+            Ok(info) => info!("Connected! {:?}", info),
+            Err(e) => {
+                info!("Failed to connect: {:?}", e);
+                Timer::after_secs(5).await;
+                continue;
+            }
+        }
+        let _ = controller.wait_for_disconnect_async().await;
+        info!("Disconnected, retrying...");
+        Timer::after_secs(5).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn net_task(mut runner: embassy_net::Runner<'static, esp_radio::wifi::Interface<'static>>) {
+    runner.run().await
+}
+
+#[embassy_executor::task]
+async fn web_task(stack: embassy_net::Stack<'static>, mut led: Output<'static>) {
+    let mut rx_buffer = [0u8; 1024];
+    let mut tx_buffer = [0u8; 1024];
+
+    loop {
+        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+        socket.set_timeout(Some(Duration::from_secs(10)));
+
+        info!("Listening on port 80...");
+        if let Err(e) = socket.accept(80).await {
+            continue;
+        }
+
+        let mut buf = [0u8; 512];
+        let n = match socket.read(&mut buf).await {
+            Ok(0) => { socket.close(); continue; }
+            Ok(n) => n,
+            Err(_) => { socket.close(); continue; }
+        };
+
+        let request = core::str::from_utf8(&buf[..n]).unwrap_or("");
+        let path = request.split_whitespace().nth(1).unwrap_or("/");
+
+        let body = if path == "/on" {
+            led.set_high();
+            "&lt;html&gt;&lt;body&gt;&lt;h1&gt;LED is ON&lt;/h1&gt;&lt;a href=\"/off\"&gt;Turn OFF&lt;/a&gt;&lt;/body&gt;&lt;/html&gt;"
+        } else if path == "/off" {
+            led.set_low();
+            "&lt;html&gt;&lt;body&gt;&lt;h1&gt;LED is OFF&lt;/h1&gt;&lt;a href=\"/on\"&gt;Turn ON&lt;/a&gt;&lt;/body&gt;&lt;/html&gt;"
+        } else {
+            "&lt;html&gt;&lt;body&gt;&lt;h1&gt;ESP32-C3 LED Control&lt;/h1&gt;&lt;a href=\"/on\"&gt;ON&lt;/a&gt; | &lt;a href=\"/off\"&gt;OFF&lt;/a&gt;&lt;/body&gt;&lt;/html&gt;"
+        };
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+
+        let _ = socket.write_all(response.as_bytes()).await;
+        let _ = socket.flush().await;
+        socket.close();
+        Timer::after_millis(100).await;
+        socket.abort();
+    }
+}</code></pre>
+  </details>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7</span>Configuration &amp; Flashing</h2>
+  <ol>
+    <li>Install the RISC-V Rust target: <code>rustup target add riscv32imc-unknown-none-elf</code>.</li>
+    <li>Configure your 2.4 GHz Wi-Fi SSID and password in <code>src/bin/main.rs</code>.</li>
+    <li>Connect the ESP32-C3 board to your host via USB.</li>
+    <li>Run <code>cargo run --release</code>. The binary compiles with LLVM link-time optimization (LTO) and flashes automatically using <code>espflash</code>.</li>
+    <li>Observe the Serial Monitor for the assigned IP address (e.g. <code>192.168.1.50</code>).</li>
+    <li>On any device on the same Wi-Fi, navigate to <code>http://192.168.1.50/</code> and toggle the LED.</li>
+  </ol>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8</span>Evidence</h2>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="evidence/task1-web-control.jpeg" alt="Task 1 Smartphone Browser Control &amp; ESP32-C3 Board">
+      <figcaption>Real physical test: Smartphone browser navigating to ESP32-C3 web page with breadboard circuit.</figcaption>
+    </figure>
+    <figure class="shot">
+      <video controls poster="evidence/task1-web-control.jpeg" preload="metadata">
+        <source src="evidence/task1-web-control.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+      <figcaption>Live Demonstration Video: Toggling LED ON/OFF in real time from the phone browser.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="evidence/rig/task1-physical-led-on.jpeg" alt="LED Turned ON">
+      <figcaption>Breadboard LED illuminated following HTTP GET /on request.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="evidence/rig/task1-physical-led-off.jpeg" alt="LED Turned OFF">
+      <figcaption>LED extinguished following HTTP GET /off request.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9</span>Challenges &amp; Fixes</h2>
+  <div class="fix">
+    <p><b>Problem:</b> Heap allocation crash on bare-metal startup.</p>
+    <p><b>Why:</b> In <code>no_std</code> Rust, there is no OS-level <code>glibc malloc</code>. Dynamic formatting of the HTTP response string failed when memory was uninitialized.</p>
+    <p><b>Fix:</b> Initialized dual heap allocators using <code>esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024)</code> and <code>36 * 1024</code> directly in SRAM prior to RTOS scheduler startup.</p>
+  </div>
+  <div class="fix">
+    <p><b>Problem:</b> TCP socket state lingering after connection close.</p>
+    <p><b>Why:</b> HTTP clients in mobile browsers keep sockets open with keep-alive headers, blocking subsequent incoming connections on a single-socket embedded server.</p>
+    <p><b>Fix:</b> Explicitly sent <code>Connection: close</code> HTTP header, flushed the TCP stream, waited 100 ms, and invoked <code>socket.abort()</code> to immediately return the socket to listening state.</p>
+  </div>
+  <div class="fix">
+    <p><b>Problem:</b> 5 GHz Wi-Fi invisibility.</p>
+    <p><b>Why:</b> The ESP32-C3 radio hardware is strictly 2.4 GHz (802.11 b/g/n).</p>
+    <p><b>Fix:</b> Dedicated 2.4 GHz SSID configuration verified via serial diagnostics loop with automatic reconnection retry.</p>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>Reflection</h2>
+  <p>Implementing a web server in bare-metal Rust provided an intimate understanding of low-level networking. Unlike abstractions where HTTP servers run invisibly behind multi-megabyte frameworks, writing the raw TCP socket handling in Embassy highlighted the exact mechanics of HTTP parsing, buffer management, and non-blocking asynchronous state machines.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>Repository Link</h2>
+  <p>Complete source code, toolchain configs, and build files: <a href="https://github.com/Udhayan27-Dev/IoT_Task1" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT_Task1</a></p>
+</section>
+
+<section id="checklist">
+  <h2><span class="num">✓</span>Checklist Coverage</h2>
+  <div class="tablewrap">
+    <table class="check">
+      <thead>
+        <tr><th>Guide Requirement</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Objective &amp; problem addressed</td><td><a href="#s1">1. Overview</a></td></tr>
+        <tr><td>Core concept of embedded web server</td><td><a href="#s2">2. Concepts</a></td></tr>
+        <tr><td>Browser &amp; ESP32 communication mechanism</td><td><a href="#s3">3. Architecture</a></td></tr>
+        <tr><td>Hardware &amp; toolchain inventory</td><td><a href="#s4">4. Hardware &amp; Software</a></td></tr>
+        <tr><td>Circuit schematic &amp; pinout table</td><td><a href="#s5">5. Wiring / Setup</a></td></tr>
+        <tr><td>Complete source code in Rust</td><td><a href="#s6">6. Implementation</a></td></tr>
+        <tr><td>Configuration &amp; flashing guide</td><td><a href="#s7">7. Configuration</a></td></tr>
+        <tr><td>Photographic &amp; video evidence</td><td><a href="#s8">8. Evidence</a></td></tr>
+        <tr><td>Debugging &amp; problem resolution</td><td><a href="#s9">9. Challenges &amp; Fixes</a></td></tr>
+        <tr><td>Engineering reflection</td><td><a href="#s10">10. Reflection</a></td></tr>
+        <tr><td>Full repository link</td><td><a href="#s11">11. Repository Link</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer class="wrap foot">
+  IoT Portfolio · Udhayan · Embedded Rust on ESP32-C3 · <a href="https://github.com/Udhayan27-Dev/IoT_Task1" target="_blank" rel="noopener">Task 1 on GitHub</a>
+</footer>
+</body>
+</html>

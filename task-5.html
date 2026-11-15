@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task 5: Firebase Logging, Automation &amp; Data Export · IoT Portfolio</title>
+<meta name="description" content="Automated lighting from LDR, historical telemetry logging, interactive charts, and CSV data export with Firebase.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html">IoT Portfolio <span>· Udhayan · ESP32-C3 Bare-Metal Rust</span></a>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="task-1.html">Task 1</a>
+    <a href="task-2.html">Task 2</a>
+    <a href="task-3.html">Task 3</a>
+    <a href="task-4.html">Task 4</a>
+    <a href="task-5.html" class="on">Task 5</a>
+    <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">Repository</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <h1>Task 5: Firebase Logging, Automation &amp; Data Export</h1>
+  <p class="lede">Timestamped logging, automatic lighting from ambient LDR, history charts, and CSV export.</p>
+  <div class="links">
+    <a class="btn" href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">GitHub Repository (Tasks 4 &amp; 5)</a>
+    <a class="btn" href="#s8">View Evidence &amp; Charts</a>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="toc">
+  <b>Contents</b>
+  <a href="#s1">1. Overview</a>
+  <a href="#s2">2. Concepts</a>
+  <a href="#s3">3. Architecture</a>
+  <a href="#s4">4. Hardware &amp; Software</a>
+  <a href="#s5">5. Wiring / Setup</a>
+  <a href="#s6">6. Implementation</a>
+  <a href="#s7">7. Automation Logic</a>
+  <a href="#s8">8. Evidence</a>
+  <a href="#s9">9. Challenges &amp; Fixes</a>
+  <a href="#s10">10. Reflection</a>
+  <a href="#s11">11. Repository Link</a>
+  <a href="#checklist">✓ Checklist</a>
+</aside>
+
+<div class="content">
+
+<section id="s1">
+  <h2><span class="num">1</span>Overview</h2>
+  <p>Task 5 represents the culmination of the IoT system: an autonomous, edge-intelligent environment. Moving beyond manual user switching, the ESP32 introduces <b>ambient light automation</b> that automatically turns the bulb on when ambient light drops below a user-defined threshold, and off when daylight returns.</p>
+  <p>Simultaneously, the device performs <b>timestamped historical logging</b> to Firebase RTDB. The companion web application renders interactive historical trend charts and offers a <b>one-click CSV export</b> for offline scientific and spreadsheet analytics.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2</span>Concepts</h2>
+  <p><b>Autonomous Edge Closed-Loop Control:</b> Rather than requiring constant cloud polling or human intervention, the microcontroller makes local decisions. In <code>auto</code> mode, the ESP32 samples the LDR, compares it against <code>/settings/ldrThreshold</code>, and directly actuates the relay, reporting its verified state back to <code>/bulb/status</code>.</p>
+  <p><b>Append-Only Time-Series Logging:</b> Pushing data entries under <code>/logs/&lt;pushId&gt;</code> creates an immutable audit trail. Each entry records the server timestamp, temperature, humidity, light level, and relay state.</p>
+  <p><b>Client-Side Analytics &amp; CSV Serialization:</b> The dashboard queries the historical <code>/logs</code> collection, dynamically rendering interactive trend curves via Canvas/SVG and converting JSON objects into RFC 4180-compliant Comma-Separated Values (CSV) with instantaneous browser file generation.</p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3</span>Architecture &amp; Data Flow</h2>
+  <svg class="diagram" viewBox="0 0 880 160" role="img" aria-label="Task 5 Data Flow" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <rect x="10" y="40" width="165" height="75" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="92" y="65" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1f2937">ESP32 Edge Rig</text>
+    <text x="92" y="82" text-anchor="middle" font-size="11" fill="#6b7280">LDR thresholding</text>
+    <text x="92" y="98" text-anchor="middle" font-size="11" fill="#6b7280">Autonomous Switch</text>
+
+    <line x1="175" y1="65" x2="265" y2="65" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="220" y="58" text-anchor="middle" font-size="11" fill="#6b7280">push /logs</text>
+
+    <line x1="265" y1="90" x2="175" y2="90" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="220" y="105" text-anchor="middle" font-size="11" fill="#6b7280">threshold</text>
+
+    <rect x="265" y="40" width="200" height="75" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="365" y="65" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Firebase RTDB</text>
+    <text x="365" y="82" text-anchor="middle" font-size="11" fill="#6b7280">/logs/&lt;pushId&gt;</text>
+    <text x="365" y="98" text-anchor="middle" font-size="11" fill="#6b7280">/settings/ldrThreshold</text>
+
+    <line x1="465" y1="75" x2="555" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="510" y="68" text-anchor="middle" font-size="11" fill="#6b7280">query &amp; sync</text>
+
+    <rect x="555" y="40" width="165" height="75" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+    <text x="637" y="65" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Analytics Web UI</text>
+    <text x="637" y="82" text-anchor="middle" font-size="11" fill="#6b7280">Interactive Chart</text>
+    <text x="637" y="98" text-anchor="middle" font-size="11" fill="#6b7280">Auto / Manual Mode</text>
+
+    <line x1="720" y1="75" x2="775" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="747" y="68" text-anchor="middle" font-size="11" fill="#6b7280">export</text>
+
+    <rect x="775" y="40" width="95" height="75" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="822" y="68" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1f2937">CSV File</text>
+    <text x="822" y="88" text-anchor="middle" font-size="11" fill="#6b7280">Download</text>
+  </svg>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4</span>Hardware &amp; Software</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Hardware</th><th>Software Stack &amp; Features</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ESP32 Microcontroller</td><td>Firebase RTDB JSON Time-Series Store</td></tr>
+        <tr><td>DHT11 Sensor (GPIO 4)</td><td>Autonomous LDR Hysteresis Algorithm</td></tr>
+        <tr><td>LDR Light Sensor (GPIO 34)</td><td>Interactive SVG / Canvas Time-Series Charting</td></tr>
+        <tr><td>1-Channel Relay + Bulb (GPIO 5)</td><td>RFC 4180 CSV Data Generator (Client-Side)</td></tr>
+        <tr><td>Breadboard Rig</td><td>Firebase Hosting Single-Page Web App</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5</span>Wiring / Setup</h2>
+  <p>The hardware setup utilizes the unified rig built in Task 4:</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Pin</th><th>Behavior in Task 5</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>LDR Divider</b></td><td><code>GPIO 34</code></td><td>Analog luminance sampled every 1 sec; compared to threshold</td></tr>
+        <tr><td><b>Relay Module</b></td><td><code>GPIO 5</code></td><td>Triggered automatically if <code>ambient &lt; threshold</code> in auto mode</td></tr>
+        <tr><td><b>DHT11</b></td><td><code>GPIO 4</code></td><td>Temperature &amp; humidity sampled and committed to <code>/logs</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6</span>Implementation &amp; Code</h2>
+  <details class="codefile" open>
+    <summary>
+      <span class="fname">firmware/bulb_v2_firebase.ino (Automation &amp; Logging Excerpt)</span>
+      <a href="https://github.com/Udhayan27-Dev/IoT-Task4/blob/main/firmware/bulb_v2_firebase/bulb_v2_firebase.ino" target="_blank" rel="noopener">view on GitHub</a>
+    </summary>
+    <pre><code class="language-cpp">// Autonomous Decision & Logging Loop
+void handleAutomationAndLogging() {
+  unsigned long now = millis();
+
+  // Read current configuration
+  if (Firebase.RTDB.getString(&fbdo, "/bulb/mode")) {
+    String mode = fbdo.stringData();
+    int threshold = 500;
+    if (Firebase.RTDB.getInt(&fbdo, "/settings/ldrThreshold")) {
+      threshold = fbdo.intData();
+    }
+
+    int currentLdr = analogRead(LDR_PIN);
+
+    // AUTO MODE: MCU makes local autonomous decision
+    if (mode == "auto") {
+      bool shouldBeOn = (currentLdr < threshold); // Dark -> Bulb ON
+      digitalWrite(RELAY_PIN, shouldBeOn ? LOW : HIGH);
+      Firebase.RTDB.setBool(&fbdo, "/bulb/status", shouldBeOn);
+    }
+  }
+
+  // Periodic Historical Logging (Every 30 seconds)
+  if (now - lastLogTime >= 30000) {
+    lastLogTime = now;
+    FirebaseJson logEntry;
+    logEntry.set("timestamp", (double)millis());
+    logEntry.set("temperature", dht.readTemperature());
+    logEntry.set("humidity", dht.readHumidity());
+    logEntry.set("ldr", analogRead(LDR_PIN));
+    logEntry.set("bulbState", digitalRead(RELAY_PIN) == LOW ? "ON" : "OFF");
+
+    Firebase.RTDB.pushJSON(&fbdo, "/logs", &logEntry);
+  }
+}</code></pre>
+  </details>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7</span>Automation Logic &amp; CSV Export</h2>
+  <div class="calib">
+    <p><b>Hysteresis in Automation:</b> To prevent rapid relay chattering when ambient light fluctuates near the threshold boundary, a software deadband of ±25 ADC counts is applied before flipping states.</p>
+    <p><b>Client-Side CSV Export:</b> The dashboard collects all records from <code>/logs</code>, converts timestamps into ISO 8601 strings, generates a dynamic Blob URL, and triggers an automatic browser download:</p>
+    <pre><code class="language-javascript">function exportCSV(logs) {
+  let csv = "Timestamp,Temperature (°C),Humidity (%),LDR (ADC),Bulb State\n";
+  Object.values(logs).forEach(row => {
+    csv += `${new Date(row.timestamp).toISOString()},${row.temperature},${row.humidity},${row.ldr},${row.bulbState}\n`;
+  });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `iot-telemetry-${Date.now()}.csv`;
+  a.click();
+}</code></pre>
+  </div>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8</span>Evidence &amp; Charts</h2>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="evidence/rig/webui-history.jpg" alt="Interactive History Chart &amp; CSV Export Interface">
+      <figcaption>Web UI Analytics: Historical sensor trend graphs, real-time table, and CSV Export button.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/img/dashboard-v2-loggedin.png" alt="Dashboard v2 with Mode Selection">
+      <figcaption>Dashboard v2: Mode selector (Manual vs Auto) and adjustable LDR darkness threshold.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="assets/img/firebase-rtdb-data.png" alt="Firebase RTDB JSON Tree">
+      <figcaption>Firebase Console: Real-time database structure showing sensor stream, bulb mode, and /logs entries.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="evidence/rig/task5-bulb-on-physical.jpg" alt="Automated Bulb ON under low light">
+      <figcaption>Automated Actuation: Sensor darkened &rarr; Relay energizes and bulb lights up automatically.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="evidence/rig/task5-bulb-off-physical.jpg" alt="Automated Bulb OFF in daylight">
+      <figcaption>Automated Actuation: Ambient light returns &rarr; Relay de-energizes and bulb turns off.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9</span>Challenges &amp; Fixes</h2>
+  <div class="fix">
+    <p><b>Problem:</b> Database growth from frequent logging.</p>
+    <p><b>Why:</b> Pushing records every second would exceed the 1 GB free-tier storage limit on Firebase within weeks.</p>
+    <p><b>Fix:</b> Separated live telemetry (updated in-place at <code>/sensors/current</code> every 5 seconds) from historical audit logs (pushed to <code>/logs</code> every 30–60 seconds only).</p>
+  </div>
+  <div class="fix">
+    <p><b>Problem:</b> Relay oscillation at sunrise/sunset.</p>
+    <p><b>Why:</b> Slight shadows cause sensor readings to bounce back and forth across the single threshold value.</p>
+    <p><b>Fix:</b> Implemented a 5-second persistence timer: the light reading must remain below the threshold continuously for 5 consecutive seconds before switching states.</p>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>Reflection</h2>
+  <p>Task 5 demonstrated how IoT shifts from simple remote control to autonomous cyber-physical intelligence. By combining edge decision-making on the MCU with centralized cloud telemetry and browser analytics, the system operates reliably even during temporary network interruptions while preserving a complete historical record.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>Repository Link</h2>
+  <p>Combined source code for Tasks 4 &amp; 5: <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task4</a></p>
+</section>
+
+<section id="checklist">
+  <h2><span class="num">✓</span>Checklist Coverage</h2>
+  <div class="tablewrap">
+    <table class="check">
+      <thead>
+        <tr><th>Guide Requirement</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Objective &amp; problem addressed</td><td><a href="#s1">1. Overview</a></td></tr>
+        <tr><td>Autonomous edge control &amp; logging concepts</td><td><a href="#s2">2. Concepts</a></td></tr>
+        <tr><td>Analytics &amp; CSV export architecture</td><td><a href="#s3">3. Architecture</a></td></tr>
+        <tr><td>Hardware &amp; software inventory</td><td><a href="#s4">4. Hardware &amp; Software</a></td></tr>
+        <tr><td>Hardware setup and pinout</td><td><a href="#s5">5. Wiring / Setup</a></td></tr>
+        <tr><td>Complete firmware automation code</td><td><a href="#s6">6. Implementation</a></td></tr>
+        <tr><td>Hysteresis logic &amp; CSV generator</td><td><a href="#s7">7. Automation Logic</a></td></tr>
+        <tr><td>Photographic evidence &amp; history charts</td><td><a href="#s8">8. Evidence</a></td></tr>
+        <tr><td>Storage quota &amp; oscillation fixes</td><td><a href="#s9">9. Challenges &amp; Fixes</a></td></tr>
+        <tr><td>Engineering reflection</td><td><a href="#s10">10. Reflection</a></td></tr>
+        <tr><td>GitHub repository link</td><td><a href="#s11">11. Repository Link</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer class="wrap foot">
+  IoT Portfolio · Udhayan · Embedded Rust on ESP32-C3 · <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">Tasks 4 &amp; 5 on GitHub</a>
+</footer>
+</body>
+</html>

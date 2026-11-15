@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IoT Portfolio · Udhayan · Embedded Rust & ESP32-C3</title>
+<meta name="description" content="ESP32-C3 · Embedded Rust (no_std) · Embassy · Adafruit IO · MQTT · Voice Assistant · Firebase — IoT Portfolio by Udhayan.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html">IoT Portfolio <span>· Udhayan · ESP32-C3 Bare-Metal Rust</span></a>
+  <nav>
+    <a href="index.html" class="on">Overview</a>
+    <a href="task-1.html">Task 1</a>
+    <a href="task-2.html">Task 2</a>
+    <a href="task-3.html">Task 3</a>
+    <a href="task-4.html">Task 4</a>
+    <a href="task-5.html">Task 5</a>
+    <a href="https://github.com/Udhayan27-Dev/IoT-portfolio" target="_blank" rel="noopener">Repository</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <h1>IoT Engineering Portfolio</h1>
+  <p class="lede">ESP32-C3 (RISC-V) · Bare-Metal Rust (<code>no_std</code>) · Embassy · Adafruit IO · MQTT · Voice Automation · Firebase</p>
+</div>
+
+<p>This portfolio documents my end-to-end IoT engineering projects built on the <b>ESP32-C3</b> RISC-V microcontroller. Unlike traditional Arduino C++ sketches, these systems leverage <b>bare-metal Embedded Rust (<code>no_std</code>)</b> with the asynchronous <b>Embassy</b> runtime, providing compile-time memory safety, zero-cost abstractions, deterministic concurrency, and maximum resource efficiency.</p>
+
+<p>The projects demonstrate a progressive evolution from a local embedded HTTP web server to cloud-connected MQTT brokers, voice assistant integration, and enterprise Firebase telemetry and automation dashboards.</p>
+
+<div class="cards">
+  <a class="card" href="task-1.html">
+    <span class="k">Task 1</span>
+    <b>ESP32-C3 Web Server &amp; HTML LED Control</b>
+    <span>Bare-metal async Rust HTTP server hosting an interactive web UI on port 80 to toggle an LED.</span>
+  </a>
+  <a class="card" href="task-2.html">
+    <span class="k">Task 2</span>
+    <b>Adafruit IO Dashboard &amp; Async MQTT Relay</b>
+    <span>Zero-allocation async MQTT 3.1.1 protocol client in Rust switching an AC mains bulb via an active-LOW relay.</span>
+  </a>
+  <a class="card" href="task-3.html">
+    <span class="k">Task 3</span>
+    <b>Voice Assistant &amp; Cloud Automation</b>
+    <span>Google Assistant voice commands routed through IFTTT webhooks to Adafruit IO MQTT for hands-free lighting.</span>
+  </a>
+  <a class="card" href="task-4.html">
+    <span class="k">Task 4</span>
+    <b>Firebase IoT Monitoring Dashboard</b>
+    <span>DHT11 temperature/humidity and ambient LDR sensing with secure Firebase Auth and real-time cloud control.</span>
+  </a>
+  <a class="card" href="task-5.html">
+    <span class="k">Task 5</span>
+    <b>Firebase Logging, Automation &amp; CSV Export</b>
+    <span>Automated lighting control based on ambient LDR thresholds, historical RTDB logging, interactive charts, and CSV data export.</span>
+  </a>
+</div>
+
+<h2>Hardware Rig &amp; Peripherals</h2>
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr>
+      <th>Component / Hardware</th>
+      <th>MCU Pin / Interface</th>
+      <th>Applied Tasks</th>
+      <th>Role &amp; Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>ESP32-C3 (RISC-V)</b></td>
+      <td>—</td>
+      <td>All Tasks (1–5)</td>
+      <td>32-bit RISC-V core @ 160 MHz, 400 KB SRAM, 2.4 GHz 802.11 b/g/n Wi-Fi</td>
+    </tr>
+    <tr>
+      <td><b>LED + 220 Ω Resistor</b></td>
+      <td><code>GPIO 10</code></td>
+      <td>Task 1</td>
+      <td>Active-HIGH digital push-pull output for direct local web control</td>
+    </tr>
+    <tr>
+      <td><b>1-Channel Relay Module + AC Bulb</b></td>
+      <td><code>GPIO 10</code> (Rust) / <code>GPIO 5</code> (Firebase)</td>
+      <td>Tasks 2–5</td>
+      <td>Optocoupled active-LOW relay isolating 230V AC mains load switching</td>
+    </tr>
+    <tr>
+      <td><b>DHT11 Digital Sensor</b></td>
+      <td><code>GPIO 4</code></td>
+      <td>Tasks 4–5</td>
+      <td>Temperature (0–50 °C) and Relative Humidity (20–90% RH)</td>
+    </tr>
+    <tr>
+      <td><b>LDR Light Sensor + 10 kΩ Divider</b></td>
+      <td><code>GPIO 34</code> (ADC)</td>
+      <td>Tasks 4–5</td>
+      <td>Ambient luminance detection for day/night automated light switching</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Architecture Highlights: Why Embedded Rust?</h2>
+<div class="calib">
+  <p><b>Memory Safety Without Garbage Collection:</b> Rust guarantees no null pointer dereferences, data races, or buffer overflows at compile time. In resource-constrained embedded systems with only 400 KB of RAM, memory bugs that cause silent stack corruption in C/C++ are caught before flashing.</p>
+  <p><b>Cooperative Asynchronous Concurrency with Embassy:</b> Traditional RTOS systems (like FreeRTOS) allocate individual stack memories for every thread (typically 4 KB per task). Embassy uses Rust's native <code>async/await</code> statemachines, running multiple concurrent tasks (Wi-Fi controller, network runner, MQTT client, TCP listener) on a <i>single</i> runtime stack with virtually zero RAM overhead.</p>
+</div>
+
+<h2>Source Code &amp; Repositories</h2>
+<ul>
+  <li><b>Task 1 (Web Server LED):</b> <a href="https://github.com/Udhayan27-Dev/IoT_Task1" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT_Task1</a></li>
+  <li><b>Task 2 (Adafruit IO MQTT Relay):</b> <a href="https://github.com/Udhayan27-Dev/IoT-Task2" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task2</a></li>
+  <li><b>Task 3 (Voice Assistant Automation):</b> <a href="https://github.com/Udhayan27-Dev/IoT-Task3" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task3</a></li>
+  <li><b>Tasks 4 &amp; 5 (Firebase Dashboard &amp; Analytics):</b> <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task4</a></li>
+  <li><b>Portfolio Website Source:</b> <a href="https://github.com/Udhayan27-Dev/IoT-portfolio" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-portfolio</a></li>
+</ul>
+
+<p class="muted">All sensitive credentials, Wi-Fi passwords, and API keys are strictly abstracted into environment templates or ignored in accordance with industry security best practices.</p>
+</main>
+
+<footer class="wrap foot">
+  IoT Portfolio · Udhayan · Embedded Rust on ESP32-C3 · <a href="https://github.com/Udhayan27-Dev/IoT-portfolio" target="_blank" rel="noopener">Source on GitHub</a>
+</footer>
+</body>
+</html>

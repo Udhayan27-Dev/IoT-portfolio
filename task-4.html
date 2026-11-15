@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task 4: Firebase IoT Monitoring Dashboard · IoT Portfolio</title>
+<meta name="description" content="ESP32 telemetry with DHT11 and LDR, Firebase Realtime Database, and authenticated web dashboard.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html">IoT Portfolio <span>· Udhayan · ESP32-C3 Bare-Metal Rust</span></a>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="task-1.html">Task 1</a>
+    <a href="task-2.html">Task 2</a>
+    <a href="task-3.html">Task 3</a>
+    <a href="task-4.html" class="on">Task 4</a>
+    <a href="task-5.html">Task 5</a>
+    <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">Repository</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <h1>Task 4: Firebase IoT Monitoring Dashboard</h1>
+  <p class="lede">DHT11 + LDR readings and bulb control on an authenticated Firebase Realtime Database dashboard.</p>
+  <div class="links">
+    <a class="btn" href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">GitHub Repository (Tasks 4 &amp; 5)</a>
+    <a class="btn" href="#s8">View Evidence &amp; Screenshots</a>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="toc">
+  <b>Contents</b>
+  <a href="#s1">1. Overview</a>
+  <a href="#s2">2. Concepts</a>
+  <a href="#s3">3. Architecture</a>
+  <a href="#s4">4. Hardware &amp; Software</a>
+  <a href="#s5">5. Wiring / Setup</a>
+  <a href="#s6">6. Implementation</a>
+  <a href="#s7">7. Configuration</a>
+  <a href="#s8">8. Evidence</a>
+  <a href="#s9">9. Challenges &amp; Fixes</a>
+  <a href="#s10">10. Reflection</a>
+  <a href="#s11">11. Repository Link</a>
+  <a href="#checklist">✓ Checklist</a>
+</aside>
+
+<div class="content">
+
+<section id="s1">
+  <h2><span class="num">1</span>Overview</h2>
+  <p>Task 4 expands the system into a complete multi-sensor environmental telemetry station and authenticated cloud control system using <b>Google Firebase</b>. The ESP32 continuously samples ambient temperature, relative humidity, and light levels, pushing live updates to <b>Firebase Realtime Database (RTDB)</b>.</p>
+  <p>A web dashboard hosted on Firebase Hosting provides real-time gauge visualizations, secure <b>Firebase Email/Password Authentication</b>, and bidirectional relay toggle controls with instant cloud synchronization.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2</span>Concepts</h2>
+  <p><b>Firebase Realtime Database (RTDB):</b> A cloud-hosted NoSQL JSON database. Data is synchronized in real time to all connected clients via persistent WebSockets, enabling instantaneous UI updates whenever sensor data or relay states change.</p>
+  <p><b>Client Authentication &amp; Security Rules:</b> Unauthenticated public internet access to actuator pins is a critical vulnerability. Firebase Authentication issues JWT tokens, while RTDB JSON rules ensure only authenticated users can read sensor nodes or modify bulb state.</p>
+  <p><b>Sensor Transduction:</b> The <b>DHT11</b> uses a proprietary single-wire bi-directional digital protocol to measure temperature (0–50 °C) and humidity (20–90%). The <b>LDR (Light Dependent Resistor)</b> forms a voltage divider with a 10 kΩ pull-down resistor, read by the microcontroller's 12-bit Analog-to-Digital Converter (ADC).</p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3</span>Architecture &amp; Data Flow</h2>
+  <svg class="diagram" viewBox="0 0 880 160" role="img" aria-label="Task 4 Data Flow" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <rect x="10" y="40" width="160" height="75" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="90" y="65" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1f2937">ESP32 Rig</text>
+    <text x="90" y="82" text-anchor="middle" font-size="11" fill="#6b7280">DHT11 + LDR</text>
+    <text x="90" y="98" text-anchor="middle" font-size="11" fill="#6b7280">Relay (Bulb)</text>
+
+    <line x1="170" y1="65" x2="265" y2="65" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="217" y="58" text-anchor="middle" font-size="11" fill="#6b7280">push /sensors</text>
+
+    <line x1="265" y1="90" x2="170" y2="90" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="217" y="105" text-anchor="middle" font-size="11" fill="#6b7280">listen /bulb</text>
+
+    <rect x="265" y="40" width="200" height="75" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="365" y="65" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Firebase RTDB</text>
+    <text x="365" y="82" text-anchor="middle" font-size="11" fill="#6b7280">/sensors/current</text>
+    <text x="365" y="98" text-anchor="middle" font-size="11" fill="#6b7280">/bulb/status</text>
+
+    <line x1="465" y1="65" x2="560" y2="65" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="512" y="58" text-anchor="middle" font-size="11" fill="#6b7280">WebSocket live</text>
+
+    <line x1="560" y1="90" x2="465" y2="90" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="512" y="105" text-anchor="middle" font-size="11" fill="#6b7280">write toggle</text>
+
+    <rect x="560" y="40" width="160" height="75" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+    <text x="640" y="65" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Web Dashboard</text>
+    <text x="640" y="82" text-anchor="middle" font-size="11" fill="#6b7280">Firebase Auth</text>
+    <text x="640" y="98" text-anchor="middle" font-size="11" fill="#6b7280">Live Telemetry</text>
+
+    <rect x="740" y="40" width="130" height="75" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="805" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2937">Firebase Auth</text>
+    <text x="805" y="88" text-anchor="middle" font-size="11" fill="#6b7280">Email/Password</text>
+  </svg>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4</span>Hardware &amp; Software</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Hardware Component</th><th>Cloud Services &amp; Libraries</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ESP32 Microcontroller</td><td>Google Firebase Realtime Database</td></tr>
+        <tr><td>DHT11 Digital Temperature &amp; Humidity Sensor</td><td>Firebase Authentication (Email/Password)</td></tr>
+        <tr><td>LDR Light Sensor + 10 kΩ Resistor</td><td>Firebase Hosting (Web Dashboard)</td></tr>
+        <tr><td>1-Channel 5V Relay + Mains Bulb</td><td>Firebase ESP Client Library (HTTP/REST)</td></tr>
+        <tr><td>Breadboard &amp; Jumper Wires</td><td>HTML5, CSS3, JavaScript (Firebase JS SDK v9)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5</span>Wiring / Setup</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Sensor / Actuator</th><th>ESP32 Pin</th><th>Wiring Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>DHT11 Data</b></td><td><code>GPIO 4</code></td><td>Connected with internal/external pull-up resistor to 3.3V</td></tr>
+        <tr><td><b>LDR Divider</b></td><td><code>GPIO 34</code></td><td>Analog ADC1 channel; LDR to 3.3V, 10 kΩ to GND</td></tr>
+        <tr><td><b>Relay IN</b></td><td><code>GPIO 5</code> / <code>GPIO 10</code></td><td>Active-LOW digital trigger</td></tr>
+        <tr><td><b>VCC &amp; GND</b></td><td><code>3.3V / 5V / GND</code></td><td>Common rail on breadboard</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6</span>Implementation</h2>
+  <details class="codefile" open>
+    <summary>
+      <span class="fname">firmware/bulb_v2_firebase.ino</span>
+      <a href="https://github.com/Udhayan27-Dev/IoT-Task4/blob/main/firmware/bulb_v2_firebase/bulb_v2_firebase.ino" target="_blank" rel="noopener">view on GitHub</a>
+    </summary>
+    <pre><code class="language-cpp">#include &lt;Arduino.h&gt;
+#include &lt;WiFi.h&gt;
+#include &lt;Firebase_ESP_Client.h&gt;
+#include &lt;DHT.h&gt;
+#include "secrets.h"
+
+#define DHTPIN        4
+#define DHTTYPE       DHT11
+#define LDR_PIN       34
+#define RELAY_PIN     5
+
+DHT dht(DHTPIN, DHTTYPE);
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH); // Relay off (active low)
+  dht.begin();
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+}
+
+void loop() {
+  if (Firebase.ready()) {
+    // 1. Read sensors & update /sensors/current
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    int ldr = analogRead(LDR_PIN);
+
+    FirebaseJson json;
+    json.set("temperature", t);
+    json.set("humidity", h);
+    json.set("ldr", ldr);
+    json.set("updatedAt", (double)millis());
+    Firebase.RTDB.setJSON(&fbdo, "/sensors/current", &json);
+
+    // 2. Read /bulb/status and actuate relay
+    if (Firebase.RTDB.getBool(&fbdo, "/bulb/status")) {
+      bool on = fbdo.boolData();
+      digitalWrite(RELAY_PIN, on ? LOW : HIGH);
+    }
+  }
+  delay(5000);
+}</code></pre>
+  </details>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7</span>Configuration</h2>
+  <ol>
+    <li>Create a Firebase Project in the Firebase Console.</li>
+    <li>Enable <b>Email/Password</b> provider under Authentication &gt; Sign-in method.</li>
+    <li>Create a Realtime Database and apply read/write security rules for authenticated users.</li>
+    <li>Fill in <code>secrets.h</code> with your Wi-Fi credentials, Firebase Web API Key, and User Email/Password.</li>
+    <li>Upload firmware to the ESP32 and open the hosted web dashboard.</li>
+  </ol>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8</span>Evidence &amp; Screenshots</h2>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="evidence/rig/webui-live.jpg" alt="Firebase Live Web Dashboard">
+      <figcaption>Live Firebase Web Dashboard: Showing current temperature, humidity, light intensity, and relay switch.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="evidence/rig/task5-hardware-relay-bulb.jpg" alt="Physical Setup: ESP32 with DHT11, LDR, and Relay">
+      <figcaption>Physical breadboard rig: ESP32 wired to DHT11, LDR divider, and relay switching the bulb.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="assets/img/dashboard-login.png" alt="Firebase Authentication Login Form">
+      <figcaption>Web Dashboard Authentication Screen: Email and password protection layer.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/img/dashboard-v1-loggedin.png" alt="Authenticated Live Dashboard">
+      <figcaption>Authenticated state displaying live telemetry and interactive bulb toggle.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="assets/img/firebase-auth-providers.png" alt="Firebase Auth Providers">
+      <figcaption>Firebase Console: Email/Password sign-in provider configured.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/img/firebase-rtdb-rules.png" alt="Firebase RTDB Security Rules">
+      <figcaption>Realtime Database JSON security rules restricting access to authenticated users.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9</span>Challenges &amp; Fixes</h2>
+  <div class="fix">
+    <p><b>Problem:</b> Non-linear LDR analog readings on ESP32 ADC.</p>
+    <p><b>Why:</b> ESP32 ADC pins have non-linear characteristics above 2.8V and below 0.1V.</p>
+    <p><b>Fix:</b> Calibrated with 11dB attenuation (<code>analogSetPinAttenuation(LDR_PIN, ADC_11db)</code>) and a 10 kΩ pull-down resistor to center the voltage swing between 0.3V and 2.6V under typical room lighting.</p>
+  </div>
+  <div class="fix">
+    <p><b>Problem:</b> Permission denied errors in web client.</p>
+    <p><b>Why:</b> Default RTDB security rules restrict all reads and writes unless authenticated.</p>
+    <p><b>Fix:</b> Implemented Firebase JS SDK v9 client authentication state observers (<code>onAuthStateChanged</code>) ensuring tokens are attached to every database listener.</p>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>Reflection</h2>
+  <p>Integrating Firebase demonstrated how modern cloud backends eliminate the need for custom server infrastructure. Using managed WebSockets and Realtime Database rules allows an embedded device to become a multi-tenant cloud application with instant reactivity and robust user authentication.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>Repository Link</h2>
+  <p>Complete source code for Tasks 4 &amp; 5: <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task4</a></p>
+</section>
+
+<section id="checklist">
+  <h2><span class="num">✓</span>Checklist Coverage</h2>
+  <div class="tablewrap">
+    <table class="check">
+      <thead>
+        <tr><th>Guide Requirement</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Objective &amp; problem addressed</td><td><a href="#s1">1. Overview</a></td></tr>
+        <tr><td>Realtime Database &amp; Authentication concepts</td><td><a href="#s2">2. Concepts</a></td></tr>
+        <tr><td>End-to-end cloud data flow diagram</td><td><a href="#s3">3. Architecture</a></td></tr>
+        <tr><td>Hardware &amp; service components</td><td><a href="#s4">4. Hardware &amp; Software</a></td></tr>
+        <tr><td>Sensor pinout and wiring table</td><td><a href="#s5">5. Wiring / Setup</a></td></tr>
+        <tr><td>ESP32 Firebase firmware code</td><td><a href="#s6">6. Implementation</a></td></tr>
+        <tr><td>Firebase console configuration</td><td><a href="#s7">7. Configuration</a></td></tr>
+        <tr><td>Photographic evidence &amp; dashboard screens</td><td><a href="#s8">8. Evidence</a></td></tr>
+        <tr><td>ADC calibration &amp; security rule fixes</td><td><a href="#s9">9. Challenges &amp; Fixes</a></td></tr>
+        <tr><td>Technical reflection</td><td><a href="#s10">10. Reflection</a></td></tr>
+        <tr><td>GitHub repository link</td><td><a href="#s11">11. Repository Link</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer class="wrap foot">
+  IoT Portfolio · Udhayan · Embedded Rust on ESP32-C3 · <a href="https://github.com/Udhayan27-Dev/IoT-Task4" target="_blank" rel="noopener">Task 4 on GitHub</a>
+</footer>
+</body>
+</html>

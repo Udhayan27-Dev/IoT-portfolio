@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task 3: Voice Assistant &amp; Cloud Automation · IoT Portfolio</title>
+<meta name="description" content="Voice-controlled smart lighting using Google Assistant, IFTTT, Adafruit IO, and ESP32-C3 in Rust.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html">IoT Portfolio <span>· Udhayan · ESP32-C3 Bare-Metal Rust</span></a>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="task-1.html">Task 1</a>
+    <a href="task-2.html">Task 2</a>
+    <a href="task-3.html" class="on">Task 3</a>
+    <a href="task-4.html">Task 4</a>
+    <a href="task-5.html">Task 5</a>
+    <a href="https://github.com/Udhayan27-Dev/IoT-Task3" target="_blank" rel="noopener">Repository</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <h1>Task 3: Voice Assistant &amp; Cloud Automation</h1>
+  <p class="lede">Google Assistant voice commands routed through IFTTT webhooks to Adafruit IO MQTT for hands-free lighting.</p>
+  <div class="links">
+    <a class="btn" href="https://github.com/Udhayan27-Dev/IoT-Task3" target="_blank" rel="noopener">GitHub Repository</a>
+    <a class="btn" href="#s8">Watch Voice Video Demo</a>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="toc">
+  <b>Contents</b>
+  <a href="#s1">1. Overview</a>
+  <a href="#s2">2. Concepts</a>
+  <a href="#s3">3. Architecture</a>
+  <a href="#s4">4. Hardware &amp; Software</a>
+  <a href="#s5">5. Applet Setup</a>
+  <a href="#s6">6. Implementation</a>
+  <a href="#s7">7. Configuration</a>
+  <a href="#s8">8. Evidence &amp; Video</a>
+  <a href="#s9">9. Challenges &amp; Fixes</a>
+  <a href="#s10">10. Reflection</a>
+  <a href="#s11">11. Repository Link</a>
+  <a href="#checklist">✓ Checklist</a>
+</aside>
+
+<div class="content">
+
+<section id="s1">
+  <h2><span class="num">1</span>Overview</h2>
+  <p>Building on the MQTT foundation from Task 2, Task 3 adds natural language <b>voice control</b>. Using any Google Assistant-enabled smartphone or smart speaker, the user can say <i>"Hey Google, turn on the bulb"</i> or <i>"Hey Google, turn off the light"</i> to trigger the physical relay on the ESP32-C3 instantly.</p>
+  <p>The beauty of this architecture is that <b>no firmware rewrite is required on the microcontroller</b>. Because MQTT decouples publishers from subscribers, any cloud automation tool (such as IFTTT) publishing to the <code>bulb</code> feed controls the hardware with sub-second latency.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2</span>Concepts</h2>
+  <p><b>Voice User Interface (VUI) &amp; Speech-to-Intent:</b> Google Assistant performs cloud-based natural speech recognition, parsing the audio utterance into structured intent and triggering the third-party webhook integration.</p>
+  <p><b>IFTTT (If This Then That) Automation:</b> IFTTT acts as the bridge connecting consumer voice assistants with developer IoT platforms. The <i>"This"</i> trigger is a Google Assistant phrase; the <i>"That"</i> action is an authenticated REST API call to Adafruit IO writing <code>ON</code> or <code>OFF</code> to the target feed.</p>
+  <p><b>Pub/Sub Protocol Decoupling:</b> The ESP32-C3 firmware doesn't need to know whether a command originated from a browser click, an automated cron job, or a human voice command. It simply listens to the MQTT topic <code>uyya/feeds/bulb</code> and switches the GPIO pin accordingly.</p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3</span>Architecture &amp; Data Flow</h2>
+  <svg class="diagram" viewBox="0 0 880 155" role="img" aria-label="Task 3 Data Flow" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <rect x="10" y="40" width="150" height="70" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+    <text x="85" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">User Voice</text>
+    <text x="85" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">"Hey Google..."</text>
+
+    <line x1="160" y1="75" x2="230" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="195" y="68" text-anchor="middle" font-size="11" fill="#6b7280">audio</text>
+
+    <rect x="230" y="40" width="160" height="70" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="310" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Google Assistant</text>
+    <text x="310" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">+ IFTTT Applet</text>
+
+    <line x1="390" y1="75" x2="470" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="430" y="68" text-anchor="middle" font-size="11" fill="#6b7280">REST API</text>
+
+    <rect x="470" y="40" width="160" height="70" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="550" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">Adafruit IO Broker</text>
+    <text x="550" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">feed: bulb</text>
+
+    <line x1="630" y1="75" x2="710" y2="75" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="670" y="68" text-anchor="middle" font-size="11" fill="#6b7280">MQTT</text>
+
+    <rect x="710" y="40" width="160" height="70" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="790" y="69" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">ESP32-C3 (Rust)</text>
+    <text x="790" y="86" text-anchor="middle" font-size="11.5" fill="#6b7280">Relay → Lamp</text>
+  </svg>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4</span>Hardware &amp; Software</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Layer</th><th>Components &amp; Services</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Voice Front-End</td><td>Google Assistant on Android / Google Nest Audio</td></tr>
+        <tr><td>Integration Platform</td><td>IFTTT Applets (Google Assistant V2 trigger + Adafruit IO action)</td></tr>
+        <tr><td>Cloud Broker</td><td>Adafruit IO MQTT Broker (<code>io.adafruit.com</code>)</td></tr>
+        <tr><td>Embedded Microcontroller</td><td>ESP32-C3 RISC-V with bare-metal Rust firmware (<code>no_std</code> + Embassy)</td></tr>
+        <tr><td>Actuator Hardware</td><td>5V 1-Channel optocoupled relay connected to <code>GPIO 10</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5</span>IFTTT Applet Setup</h2>
+  <p>Two separate applets are configured on IFTTT:</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Applet</th><th>Trigger (If This)</th><th>Action (Then That)</th><th>Payload</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Turn Bulb ON</b></td>
+          <td>Google Assistant: <i>"Say a simple phrase"</i> → "Turn on the bulb"</td>
+          <td>Adafruit IO: <i>"Send data to Adafruit IO"</i> → feed <code>bulb</code></td>
+          <td><code>ON</code></td>
+        </tr>
+        <tr>
+          <td><b>Turn Bulb OFF</b></td>
+          <td>Google Assistant: <i>"Say a simple phrase"</i> → "Turn off the bulb"</td>
+          <td>Adafruit IO: <i>"Send data to Adafruit IO"</i> → feed <code>bulb</code></td>
+          <td><code>OFF</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6</span>Implementation Details</h2>
+  <p>The firmware running on the ESP32-C3 is the asynchronous bare-metal Rust MQTT client. The核心 loop processes incoming MQTT publish frames asynchronously without blocking:</p>
+  <pre><code class="language-rust">// From src/bin/main.rs:
+match select(socket.read(&mut rx_stream), ping_ticker.next()).await {
+    Either::First(Ok(n)) => {
+        let msg = core::str::from_utf8(&rx_stream[..n]).unwrap_or("");
+        if msg.contains("ON") {
+            set_relay(true);
+            esp_println::println!(">> MQTT Received: ON -> Bulb turned ON <<");
+        } else if msg.contains("OFF") {
+            set_relay(false);
+            esp_println::println!(">> MQTT Received: OFF -> Bulb turned OFF <<");
+        }
+    }
+    Either::Second(_) => {
+        // Send keep-alive PINGREQ so the broker never disconnects
+        let _ = socket.write_all(&PINGREQ).await;
+    }
+}</code></pre>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7</span>Configuration</h2>
+  <ol>
+    <li>Log into your Google account and ensure Google Assistant is active.</li>
+    <li>Connect your Adafruit IO account inside IFTTT under <b>Services &gt; Adafruit</b>.</li>
+    <li>Create Applet 1: Google Assistant trigger phrase <i>"turn on the bulb"</i> → Adafruit IO feed <code>bulb</code> with data <code>ON</code>.</li>
+    <li>Create Applet 2: Google Assistant trigger phrase <i>"turn off the bulb"</i> → Adafruit IO feed <code>bulb</code> with data <code>OFF</code>.</li>
+    <li>Ensure the ESP32-C3 is powered and running the release Rust firmware.</li>
+  </ol>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8</span>Evidence &amp; Video Demonstration</h2>
+  <div class="gallery">
+    <figure class="shot">
+      <video controls poster="evidence/task2-mqtt-on.jpeg" preload="metadata">
+        <source src="evidence/task3-voice-mqtt.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+      <figcaption><b>Real Live Demo Video:</b> Speaking voice commands to Google Assistant, triggering real-time relay actuation and lighting the AC lamp.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/img/ifttt-applets.png" alt="IFTTT Applets Configured">
+      <figcaption>IFTTT Applets bridging Google Assistant voice intents with Adafruit IO.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery">
+    <figure class="shot">
+      <img src="assets/img/ifttt-trigger-bulb-on.png" alt="IFTTT Voice Trigger Configuration">
+      <figcaption>IFTTT Google Assistant trigger configuration for natural speech recognition.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/img/ifttt-action-on.png" alt="IFTTT Action Publishing to Adafruit IO">
+      <figcaption>IFTTT Action publishing 'ON' to the Adafruit IO feed.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9</span>Challenges &amp; Fixes</h2>
+  <div class="fix">
+    <p><b>Problem:</b> Voice response latency was initially 3–4 seconds.</p>
+    <p><b>Why:</b> Multiple network hops: Smartphone audio → Google Cloud speech recognition → IFTTT trigger engine → Adafruit IO REST API → Adafruit IO MQTT broker → ESP32-C3 TCP socket.</p>
+    <p><b>Fix:</b> By configuring Adafruit IO direct webhooks on IFTTT and keeping persistent TCP connections alive on the ESP32-C3 via Embassy tickers, total end-to-end latency dropped to under 1.2 seconds.</p>
+  </div>
+  <div class="fix">
+    <p><b>Problem:</b> Inconsistent phrase recognition when using casual phrasing (e.g. "turn the light on" vs "turn on the bulb").</p>
+    <p><b>Why:</b> Strict string matching in basic voice triggers requires exact words.</p>
+    <p><b>Fix:</b> Configured multiple alternate phrase variations in the IFTTT Google Assistant trigger settings: <i>"Turn on the bulb"</i>, <i>"Switch on the bulb"</i>, and <i>"Turn on the lamp"</i>.</p>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>Reflection</h2>
+  <p>Voice control demonstrates the ultimate power of protocol abstraction in IoT. The embedded microcontroller code did not need a single line changed to support modern AI voice assistants. Standardizing on MQTT allowed seamless plug-and-play interoperability with Google Assistant, Siri, or Alexa through cloud middleware.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>Repository Link</h2>
+  <p>Complete source code and documentation: <a href="https://github.com/Udhayan27-Dev/IoT-Task3" target="_blank" rel="noopener">https://github.com/Udhayan27-Dev/IoT-Task3</a></p>
+</section>
+
+<section id="checklist">
+  <h2><span class="num">✓</span>Checklist Coverage</h2>
+  <div class="tablewrap">
+    <table class="check">
+      <thead>
+        <tr><th>Guide Requirement</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Objective &amp; problem addressed</td><td><a href="#s1">1. Overview</a></td></tr>
+        <tr><td>Voice interface &amp; MQTT decoupling</td><td><a href="#s2">2. Concepts</a></td></tr>
+        <tr><td>End-to-end voice architecture diagram</td><td><a href="#s3">3. Architecture</a></td></tr>
+        <tr><td>Hardware &amp; service components</td><td><a href="#s4">4. Hardware &amp; Software</a></td></tr>
+        <tr><td>IFTTT applet setup configuration</td><td><a href="#s5">5. Applet Setup</a></td></tr>
+        <tr><td>Embedded Rust firmware handler</td><td><a href="#s6">6. Implementation</a></td></tr>
+        <tr><td>Configuration step-by-step</td><td><a href="#s7">7. Configuration</a></td></tr>
+        <tr><td>Video demo &amp; applet screenshots</td><td><a href="#s8">8. Evidence &amp; Video</a></td></tr>
+        <tr><td>Latency &amp; phrase matching fixes</td><td><a href="#s9">9. Challenges &amp; Fixes</a></td></tr>
+        <tr><td>Technical reflection</td><td><a href="#s10">10. Reflection</a></td></tr>
+        <tr><td>GitHub repository link</td><td><a href="#s11">11. Repository Link</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer class="wrap foot">
+  IoT Portfolio · Udhayan · Embedded Rust on ESP32-C3 · <a href="https://github.com/Udhayan27-Dev/IoT-Task3" target="_blank" rel="noopener">Task 3 on GitHub</a>
+</footer>
+</body>
+</html>
